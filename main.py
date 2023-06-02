@@ -14,6 +14,9 @@ class Gameboard:
         column = self.columns[move[0]]
         return[row, column]
 
+    def get_piece(self, position):
+        return self.status[position[0]][position[1]]
+
 
 
     def slice(self, attribute):
@@ -24,9 +27,9 @@ class Gameboard:
             dum = cls(id=0, player=0)
             i = 0
             for (x, y) in dum.startpositions:
-                p = cls(id=i, player='w', position=[x,y])
+                p = cls(id=i, player='w', position=[x,y], board=self)
                 self.status[x][y] = p
-                p2 = cls(id = -i, player='b', position=[7-x,7-y])
+                p2 = cls(id = -i, player='b', position=[7-x,7-y], board=self)
                 self.status[-(x+1)][-(y+1)] = p2
                 i += 1
             self.wking = self.status[0][3]
@@ -34,19 +37,29 @@ class Gameboard:
 
     def render(self, attribute):
         row = 8
+
+        print('   ', end='')
+        print(list(self.columns.keys())[0], end='')
+        for i in range(1, 8):
+            print('-' + list(self.columns.keys())[i], end='')
+        print('')
+
         for i in self.slice(attribute)[::-1]:
             print(row, end=' ')
-            row -=1
+
             for j in i:
                 if j == 0:
                     j = ' '
                 print('|' + str(j), end = '')
             print('|', end='')
+            print(' ' + str(row), end=' ')
             print()
+            row -= 1
 
-        print('  ', end='')
-        for i in range(8):
-            print('-' + list(self.columns.keys())[i], end ='')
+        print('   ', end='')
+        print(list(self.columns.keys())[0], end='')
+        for i in range(1, 8):
+            print('-' + list(self.columns.keys())[i], end='')
         print('')
 
 
@@ -69,21 +82,18 @@ class Gameboard:
                 end = self.translate(input("to?").split(','))
                 end = list(map(int, end))
             except:
-                print('invalid input')
+                print('Out of bounds!')
                 continue
 
-            if self.check_move(start,end):
+            if self.check_move(start,end) == True:
                 break
+
+            print(self.check_move(start,end))
 
         self.status[start[0]][start[1]] = 0
         self.status[end[0]][end[1]] = piece
         piece.position = end
         piece.move_history.append(start)
-
-        if self.player == 'w':
-            self.player = 'b'
-        else:
-            self.player = 'w'
 
 
     def check_move(self, start, end):
@@ -91,8 +101,7 @@ class Gameboard:
         where = list(np.array(end) - np.array(start))
         try:
             if self.status[end[0]][end[1]].player == self.player:
-                print("can't eat your piece!")
-                return False
+                return "can't eat your piece!"
         except:
             pass
         for element in piece.moves:
@@ -101,27 +110,54 @@ class Gameboard:
                 for i in track[1:track.index(where)]:
                     path = list(np.array(start)+np.array(i))
                     if self.status[path[0]][path[1]] != 0:
-                        print('Move blocked by other Piece!')
-                        return False
+                        return 'Move blocked by other Piece!'
                 return True
-        print('Not a Valid Move!')
+        return 'Not a Valid Move!'
         return False
 
 
     def test_check(self):
-        piecelist = [x for element in self.status for x in element if x != 0]
-        if player == 'w':
-            king = self.wking
-        else:
+        piecelist = [x for element in self.status for x in element if (x != 0 and x.player == self.player)]
+        if self.player == 'w':
             king = self.bking
+        else:
+            king = self.wking
         for x in piecelist:
-            self.check_move(start=x.position, end=king.position)
-        print(piecelist)
+            if self.check_move(start=x.position, end=king.position) == True:
+                print("you're in check")
+                if self.test_checkmate(piecelist, king) == True:
+                    return True
+
+        if self.player == 'w':
+            self.player = 'b'
+        else:
+            self.player = 'w'
+
+    def inboard(self, move):
+        if (move[i] > 7) or (move[i] < 0) or (move[j] > 7) or (move[i] < 0):
+            return False
+        else:
+            return True
+
+    def test_checkmate(self, piecelist, king):
+        strikes = 0
+        for move in king.moves:
+            end = king.position + move
+            try:
+                strikes += 1
+                for piece in piecelist:
+                    if self.check_move(start=piece.position, end=end) == True:
+                        strikes -=1
+            except:
+                continue
+            if strikes == 0:
+                return False
+        return True
 
 
 #Chess Pieces
 class Chesspiece:
-    def __init__(self, id=0, player='w', position = [0,0], board=None):
+    def __init__(self, id=0, player='w', position = [0,0], board=Gameboard()):
         self.moves = []
         self.player = player
         self.id = id
@@ -134,55 +170,77 @@ class Chesspiece:
         return [(np.array(moves) * n).tolist() for n in range(num)]
 
 class Pawn(Chesspiece):
-    def __init__(self, id=0, position = [0,0], player='w', board=None):
+    def __init__(self, id=0, position = [0,0], player='w', board=Gameboard()):
         super().__init__(id, player, position, board)
         self.startpositions = [(1, x) for x in range(8)]
         self.moves = self.move_range()
         self.shortname = 'p'
 
+
+
     def move_range(self):
+        moves = []
+        moves2 = []
         if self.player == 'w':
+            moves2.append([1,0])
             if self.move_history == []:
-                return [[[1,0], [2,0]]]
-            else:
-                return [[[1,0]]]
+                moves2.append([2,0])
         else:
+            moves2.append([-1, 0])
             if self.move_history == []:
-                return [[[-2,0], [-1,0]]]
+                moves2.append([-2,0])
+
+        for i in (1, -1):
+            if self.player == 'w':
+                try:
+                    if self.board.status[self.position[0]+1][self.position[1] + i]:
+                        moves2.append([1, i])
+                except:
+                    continue
             else:
-                return [[[-1,0]]]
+                try:
+                    if self.board.status[self.position[0] - 1][self.position[1] + i]:
+                        moves2.append([-1, i])
+                except:
+                    continue
+        moves.append(moves2)
+        return moves
+
+        moves2 = property(self.position, move_range)
+
+
 
 
 class Rooke(Chesspiece):
-    def __init__(self, id=0, position = [0,0], player='w', board=None):
+    def __init__(self, id=0, position = [0,0], player='w', board=Gameboard()):
         super().__init__(id, player, position, board)
         self.startpositions = [(0,0), (0,7)]
         self.moves =  self.move_range([(1,0), (0,1), (-1,0), (0,-1)], 9)
         self.shortname = 'r'
 
 class Bishop(Chesspiece):
-    def __init__(self, id=0, position = [0,0], player='w', board=None):
+    def __init__(self, id=0, position = [0,0], player='w', board=Gameboard()):
         super().__init__(id, player, position, board)
         self.startpositions = [(0,2), (0,5)]
         self.moves = self.move_range([(1, 1), (-1, -1), (-1, 1), (1, -1)], 9)
         self.shortname = 'b'
 
 class Knight(Chesspiece):
-    def __init__(self, id=0, position = [0,0], player='w', board=None):
+    def __init__(self, id=0, position = [0,0], player='w', board=Gameboard()):
         super().__init__(id, player, position, board)
         self.startpositions = [(0,1), (0,6)]
-        self.moves = [(2,3), (3,2), (-3,2), (-2,3)]
+        self.moves = [[[2,1], [2,-1], [1,2], [1,-2],[-2,1], [-2,-1], [-1,2], [-1,-2]]]
         self.shortname = 'k'
 
 class King(Chesspiece):
-    def __init__(self, id=0, position = [0,0], player='w', board=None):
+    def __init__(self, id=0, position = [0,0], player='w', board=Gameboard()):
         super().__init__(id, player, position, board)
         self.startpositions = [(0,3)]
-        self.moves = self.move_range([(1,1), (1,-1), (-1,1), (-1,-1)], 9)
+        self.moves = self.move_range([(1,0), (0,1), (-1,0), (0,-1), (1, 1), (-1, -1), (-1, 1), (1, -1)], 2)
         self.shortname = 'K'
 
 class Queen(Chesspiece):
-    def __init__(self, id=0, position = [0,0], player='w', board=None):
+    def __init__(self, id=0, position = [0,0], player='w', board=Gameboard()):
         super().__init__(id, player, position, board)
         self.moves = self.move_range([(1,0), (0,1), (-1,0), (0,-1), (1, 1), (-1, -1), (-1, 1), (1, -1)], 9)
         self.startpositions = [(0,4)]
@@ -191,17 +249,18 @@ class Queen(Chesspiece):
 def play():
     board = Gameboard()
     board.reset()
+    print(board.status)
     board.render('shortname')
-    pawn = board.status[1][1]
+    print(board.get_piece((1, 0)).moves2)
     i = 1
     while i != 5:
         board.make_a_move()
         board.render('shortname')
-        try:
-            print(board.status[0][2].position)
-            print(board.status[0][2].move_history)
-        except:
-            print("meh")
+        board.test_check()
+
+
+
+
 
 
 play()
