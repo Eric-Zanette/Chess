@@ -115,8 +115,7 @@ class Gameboard:
                     if self.status[path[0]][path[1]] != 0:
                         return 'Move blocked by other Piece!'
                 return True
-        print('Not a Valid Move!')
-        return False
+        return 'Not a Valid Move!'
 
 #Checks if current player is in check
     def test_check(self):
@@ -131,10 +130,12 @@ class Gameboard:
                 if self.test_checkmate(piecelist, king) == True:
                     return True
 
+    def player_swap(self):
         if self.player == 'w':
             self.player = 'b'
         else:
             self.player = 'w'
+
 
 #Checks if given position is on the board
     def inboard(self, move):
@@ -246,17 +247,5 @@ class Queen(Chesspiece):
         self.base_moves = [(1,0), (0,1), (-1,0), (0,-1), (1, 1), (-1, -1), (-1, 1), (1, -1)]
         self.startpositions = [(0,4)]
         self.shortname = self.player + 'Q'
-
-def play():
-    board = Gameboard()
-    board.reset()
-    print(board.status)
-    board.render('shortname')
-    i = 1
-    while i != 5:
-        board.make_a_move()
-        board.render('shortname')
-        board.test_check()
-play()
 
 
